@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .app-container {
+            height: 100vh;
+            display: flex;
+            background: rgba(255, 255, 255, 0.95);
+            margin: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        /* Левая панель - Информация */
+        .info-panel {
+            width: 30%;
+            background: white;
+            padding: 25px;
+            overflow-y: auto;
+            border-right: 1px solid #e0e0e0;
+        }
+        
+        /* Правая панель - Карта */
+        .map-panel {
+            width: 70%;
+            position: relative;
+        }
+        
+        
+        /* Стили для информации о выбранном объекте */
+        .selected-info {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e0e0e0;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+        
+        .selected-info.active {
+            display: block;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .selected-info h3 {
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+        }
+        
+        .info-detail {
+            display: flex;
+            margin-bottom: 12px;
+            align-items: flex-start;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #333;
+            min-width: 120px;
+            font-size: 0.95rem;
+        }
+        
+        .info-value {
+            color: #666;
+            flex: 1;
+            font-size: 0.95rem;
+        }
+        
+        /* Заголовок */
+        .app-header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .app-header h1 {
+            color: #333;
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-text-fill-color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+        
+        .app-header p {
+            color: #666;
+            font-size: 1rem;
+        }
+        
+        /* Секции */
+        .section {
+            margin-bottom: 30px;
+        }
+        
+        .section-title {
+            color: #444;
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+        }
+        
+        .section-title i {
+            margin-right: 10px;
+            color: #667eea;
+        }
+        
+        /* Объекты в списке */
+        .object-item {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .object-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            background: #f0f2ff;
+        }
+        
+        .object-item h4 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+        
+        .object-item p {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+        }
+        
+        /* Легенда */
+        .legend h5 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+        
+        
+        
+        /* Кнопки управления */
+        .map-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .control-btn {
+            background: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            color: #667eea;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+        }
+        
+        .control-btn:hover {
+            transform: scale(1.1);
+            background: #667eea;
+            color: white;
+        }
+        
+        /* Стили карты */
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            right: 0;
+            left: 0;
+        }
+        
+        /* Адапт */
+        @media (max-width: 1200px) {
+            .info-panel {
+                width: 35%;
+            }
+            .map-panel {
+                width: 65%;
+            }
+        }
+        
+        @media (max-width: 992px) {
+            .app-container {
+                flex-direction: column;
+                margin: 10px;
+            }
+            .info-panel, .map-panel {
+                width: 100%;
+                height: 50%;
+            }
+            .info-panel {
+                border-right: none;
+                border-bottom: 1px solid #e0e0e0;
+            }
+            .legend {
+                bottom: 10px;
+                left: 10px;
+                padding: 15px;
+            }
+        }
+        
+        .custom-icon {
+            background: transparent !important;
+            border: none !important;
+        }
+        
+        .leaflet-image-layer {
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges; /* safari */
+            image-rendering: pixelated; /* chrome */
+            image-rendering: -moz-crisp-edges; /* firefox */
+            image-rendering: -o-crisp-edges; /* opera */
+            -ms-interpolation-mode: nearest-neighbor; /* ie */
+        }
+        .page2-button {
+            /* между сайтами */
+			display: block;
+			width: 450px;
+
+			margin: 30px auto;
+			background-color: #FFBF00;
+			color: #3B2F2F;
+			padding: 15px 30px;
+			text-align: center;
+			font-family: sans-serif, "inter bold";
+			font-size: 20px;
+			border-radius: 25px;
+			text-decoration: none;
+			font-weight: bold;
+			transition: all 0.3s ease;
+			border: 2px solid #FFBF00;
+		}
+		
+		.page2-button:hover {
+            /* между сайтами */
+			background-color: #3B2F2F;
+			color: #FFBF00;
+			transform: scale(1.05);
+		}
+    </style>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.fullscreen@3.0.0/Control.FullScreen.css"/>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Левая панель - Информация -->
+        <div class="info-panel">
+            <!-- Заголовок -->
+            <div class="app-header">
+                <h1>🗺️ Туристическая карта Москвы</h1>
+                <p>Интерактивная карта с информацией о достопримечательностях</p>
+            </div>
+            
+            <!-- между сайтами -->
+            <a href="Header.html" class="page2-button">Перейти к Первой странице →</a>
+            
+            <!-- Рекомендации -->
+            <div class="section">
+                <div class="section-title">
+                    <i class="fas fa-star"></i> Рекомендации
+                </div>
+                <p>Места, которые могут вас заинтересовать.</p>
+                
+                <div class="object-item" onclick="showObjectInfo('Московский Кремль', 'Московский Кремль - это древняя крепость в центре Москвы, главная историко-художественная и общественно-политическая резиденция Президента РФ, включенная в список Всемирного наследия ЮНЕСКО.' ,'Манежная улица, 2-10', '09:30-18:00')">
+                    <h4>Московский Кремль</h4>
+                    <!-- <p>Отличное качество звука и картины</p>
+                    <p><strong>Расстояние:</strong> Кримская - 370 м</p> -->
+                </div>
+                
+                <div class="object-item" onclick="showObjectInfo('Московский зоопарк','Московский зоопарк — это один из старейших зоопарков Европы, основанный в 1864 году, который является не только местом отдыха, но и важным научным центром, участвующим в международных программах по сохранению редких видов животных. ','Большая Грузинская улица, 1с1', '09:00-17:00')">
+                    <h4>Московский зоопарк</h4>
+                    <!-- <p>Отличное качество звука и картины</p>
+                    <p><strong>Расстояние:</strong> Кримская - 370 м</p> -->
+                </div>
+                
+                <div class="object-item" onclick="showObjectInfo('Чистые пруды', '«Чистые пруды» в Москве — это исторический район, названный в честь одного пруда на Чистопрудном бульваре, который когда-то был «поганым» и очищенный князем Меншиковым. Сегодня это популярная парковая зона с лебедями, место отдыха, а также одноименная станция метро, известная своей атмосферой достопримечательностями. ','Чистопрудный бульвар', '00:00-00:00')">
+                    <h4>Чистые пруды</h4>
+                    <!-- <p>Отличное качество звука и картины</p>
+                    <p><strong>Расстояние:</strong> Кримская - 370 м</p> -->
+                </div>
+            </div>
+            
+            
+            
+            <!-- Информация о выбранном объекте -->
+            <div id="selected-info" class="selected-info">
+                <h3 id="selected-title">Выбранный объект</h3>
+                <div id="selected-content">
+
+                    <!--
+                    <div class="info-detail">
+                        <span class="info-label">Тип:</span>
+                        <span class="info-value" id="info-type">-</span>
+                    </div>
+                    -->
+                    
+                    <div class="info-detail">
+                        <span class="info-label">Описание:</span>
+                        <span class="info-value" id="info-desc">-</span>
+                    </div>
+                    <!--
+                    <div class="info-detail">
+                        <span class="info-label">Расстояние:</span>
+                        <span class="info-value" id="info-dist">-</span>
+                    </div>
+                    -->
+
+                    <!-- 
+                    <div class="info-detail">
+                        <span class="info-label">Координаты:</span>
+                        <span class="info-value" id="info-coords">-</span>
+                    </div> 
+                    -->
+
+                    <div class="info-detail">
+                        <span class="info-label">Адрес:</span>
+                        <span class="info-value" id="info-adress">-</span>
+                    </div>
+                    <div class="info-detail">
+                        <span class="info-label">Время Работы:</span>
+                        <span class="info-value" id="info-time">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Правая панель - Карта -->
+        <div class="map-panel">
+            <div id="map"></div>
+            
+            
+            <!-- Кнопки управления -->
+            <div class="map-controls">
+                <button class="control-btn" onclick="map.flyTo([55.760000000000005, 37.599999999999994], 16)">
+                    <i class="fas fa-home"></i>
+                </button>
+                <button class="control-btn" onclick="map.zoomIn()">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <button class="control-btn" onclick="map.zoomOut()">
+                    <i class="fas fa-minus"></i>
+                </button>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // карта
+        var map = L.map('map', {
+            center: [55.760000000000005, 37.599999999999994],
+            zoom: 15,
+            minZoom: 16,
+            maxZoom: 17,
+            crs: L.CRS.EPSG3857,
+            maxBounds: [[55.74, 37.58], [55.78, 37.62]],
+            maxBoundsViscosity: 1.0,
+            zoomControl: false,
+            scrollWheelZoom: true,
+            dragging: true,
+            attributionControl: false 
+        });
+        var imageUrl = 'MapOfMoscow копия 4K.svg'; 
+        
+        
+        var imageOverlay = L.imageOverlay(
+            imageUrl,
+            [[55.74, 37.58], [55.78, 37.62]],
+            {
+                opacity: 1.0,
+                interactive: false,
+                zindex: 1
+            }
+        ).addTo(map);
+
+        // маркеры для объектов
+
+        // Кремль
+        var plantMarker = L.marker([55.761130, 37.599727], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #FF6B6B; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [80, 60]
+            }),
+            // objectType: 'sqt',
+            objectName: 'Кремль'
+        }).addTo(map);
+
+        // Большой Театр
+        var caliberMarker = L.marker([55.761920, 37.598102], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #4ECDC4; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [100, 60]
+            }),
+            // objectType: 'caliber',
+            objectName: 'Большой Театр'
+        }).addTo(map);
+
+        // Храм Христа Спасителя
+        var serviceMarker = L.marker([55.760374, 37.598366], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [90, 60]
+            }),
+            // objectType: 'service',
+            objectName: 'Храм Христа Спасителя'
+        }).addTo(map);
+
+        // Центральный детский мир
+        var CDMMarker = L.marker([55.762508, 37.601140], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [110, 45]
+            }),
+            objectName: 'Центральный детский мир'
+        }).addTo(map); 
+        
+        // Третьяковская галерея
+        var GalleryMarker = L.marker([55.759637, 37.600428], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [105, 55]
+            }),
+            objectName: 'Третьяковская галерея'
+        }).addTo(map);
+
+        // Новая Третьяковская галерея
+        var NewGalleryMarker = L.marker([55.759152, 37.598451], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [105, 40]
+            }),
+            objectName: 'Новая Третьяковская галерея'
+        }).addTo(map);
+
+        // Храм Василия Блаженного    нет
+        //var HRAM_VB_Marker = L.marker([55.752517, 37.623131], {
+            //icon: L.divIcon({
+                //className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">Храм Василия Блаженного</div>',
+                //iconSize: [80, 40]
+            //}),
+            //objectName: 'Храм Василия Блаженного'
+        //}).addTo(map);
+
+        
+        // Московский зоопарк
+        var Mos_zoo_Marker = L.marker([55.762709, 37.594830], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [80, 60]
+            }),
+            objectName: 'Московский зоопарк'
+        }).addTo(map);
+
+
+        // Москва-Сити
+        var Mos_City_Marker = L.marker([55.760853, 37.589920], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [120, 100]
+            }),
+            objectName: 'Московский международный деловой центр Москва-Сити'
+        }).addTo(map);
+
+        // Екатерининский дворец 
+        var Eca_home_Marker = L.marker([55.762309, 37.610497], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [185, 95]
+            }),
+            objectName: 'Екатерининский дворец'
+        }).addTo(map);  
+
+        // Лужники
+        var Lugniki_Marker = L.marker([55.756954, 37.592254], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [150, 65]
+            }),
+            objectName: 'Лужники'
+        }).addTo(map);
+
+        // Музей русского импрессионизма
+        var Rus_impress_Marker = L.marker([55.764269, 37.594399], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [85, 70]
+            }),
+            objectName: 'Музей русского импрессионизма'
+        }).addTo(map);
+
+
+        // Государственный исторический музей  
+        var History_goss_Marker = L.marker([55.761260, 37.601411], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [80, 60]
+            }),
+            objectName: 'Государственный исторический музей'
+        }).addTo(map);
+
+
+        // Московский государственный университет имени М. В. Ломоносова
+        var MGY_Marker = L.marker([55.755143, 37.588845], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [170, 120]
+            }),
+            objectName: 'Московский государственный университет имени М. В. Ломоносова'
+        }).addTo(map); 
+
+        // Парк культуры и отдыха Воробьёвы горы. 
+        var VOrGor_Marker = L.marker([55.756035, 37.591900], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [90, 90]
+            }),
+            objectName: 'Парк культуры и отдыха Воробьёвы горы.'
+        }).addTo(map); 
+
+
+        // Центральный парк культуры и отдыха им. М. Горького
+        var Gorpark_Marker = L.marker([55.757550, 37.596631], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [90, 90]
+            }),
+            objectName: 'Центральный парк культуры и отдыха им. М. Горького'
+        }).addTo(map); 
+
+        // Патриаршие пруды
+        var Patrish_Marker = L.marker([55.763062, 37.596663], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [90, 90]
+            }),
+            objectName: 'Патриаршие пруды'
+        }).addTo(map);
+
+        // Чистые пруды
+        var Chist_Marker = L.marker([55.762618, 37.603396], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [90, 90]
+            }),
+            objectName: 'Чистые пруды'
+        }).addTo(map);
+
+        // Парк Красная Пресня 
+        var Red_park_Marker = L.marker([55.761891, 37.592121], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [90, 90]
+            }),
+            objectName: 'Парк Красная Пресня'
+        }).addTo(map);
+
+        // Аптекарский огород
+        var Apetec_Marker = L.marker([55.764471, 37.602355], {
+            icon: L.divIcon({
+                className: 'custom-icon',
+                //html: '<div style="background: #45B7D1; color: white; padding: 8px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2);"></div>',
+                iconSize: [110, 70]
+            }),
+            objectName: 'Аптекарский огород'
+        }).addTo(map);
+
+
+
+
+        // Функция для отображения информации об объекте
+        function showObjectInfo(name, desc, adress, time) {
+            document.getElementById('selected-title').textContent = name;
+            // document.getElementById('info-type').textContent = item.type;
+            document.getElementById('info-desc').textContent = desc;
+            // document.getElementById('info-dist').textContent = '-';
+            // document.getElementById('info-coords').textContent = e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6);
+            document.getElementById('info-adress').textContent = adress;
+            document.getElementById('info-time').textContent = time;
+            
+            
+            document.getElementById('selected-info').classList.add('active');
+            
+            // Прокрутка к информации
+            document.getElementById('selected-info').scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        }
+
+
+        // Обработчики клика для объектов на карте
+        var objects = [
+            {obj: plantMarker, name: "Московский Кремль", desc: "Московский Кремль - это древняя крепость в центре Москвы, главная историко-художественная и общественно-политическая резиденция Президента РФ, включенная в список Всемирного наследия ЮНЕСКО. ", adress: "Манежная улица, 2-10", time: "09:30-18:00"},
+            {obj: caliberMarker, name: "Большой Театр", desc: "Большой театр - это один из крупнейших и старейших в России и значительнейших в мире театров оперы и балета, расположенный в центре Москвы. Это не просто здание, а символ русской культуры и искусства, известный своими богатой историей, великолепной архитектурой и всемирно известными оперными и балетными постановками.", adress: "Театральная площадь, 1", time: "11:00-20:00"},
+            {obj: serviceMarker, name: "Храм Христа Спасителя", desc: "Храм Христа Спасителя - это главный собор Русской православной церкви, крупнейший православный храм России.  Храм действующий и является главным в стране — здесь проводит службы Патриарх, проходят церковные форумы и заседания Архиерейских соборов.", adress: "Улица Волхонка, 15", time: "10:00-18:00"},
+            {obj: CDMMarker, name: "Центральный детский мир", desc: "Центральный детский мир -  это крупнейший в России специализированный детский торгово-развлекательный комплекс, уникальное место в центре Москвы с магазинами игрушек, одежды, кафе, ресторанов, а также развлекательными зонами, музеем.", adress: "Театральный пр., 5, стр. 1", time: "10:00-22:00"},
+            {obj: GalleryMarker, name: "Третьяковская галерея", desc: "Третьяковская галерея - это главный национальный музей русского искусства в Москве, уникальная сокровищница, основанная Павлом Третьяковым в 1856 году, которая хранит более 180 тысяч экспонатов.", adress: "Лаврушинский переулок, 10с4", time: "10:00-18:00"},
+            {obj: NewGalleryMarker, name: "Новая Третьяковская галерея", desc: "Новая Третьяковка представляет наиболее полную в нашей стране постоянную экспозицию отечественного искусства ХХ века во всем его многообразии — авангард, социалистический реализм, искусство «сурового стиля» и «андеграунда», новейшие течения. Здесь проводятся масштабные ретроспективы великих русских художников, открываются экспериментальные выставки молодых авторов. ", adress: "улица Крымский Вал, 10", time: "10:00-18:00"},
+            //{obj: HRAM_VB_Marker, name: "Храм Василия Блаженного", desc: "Храм Василия Блаженного, или Собор Покрова Пресвятой Богородицы на Рву, — это знаменитый православный собор на Красной площади в Москве, уникальный памятник древнерусской архитектуры XVI века, построенный по приказу Ивана Грозного в честь взятия Казани, представляющий собой комплекс из 11 церквей на едином основании. ", adress: "Красная площадь, 7", time: "11:00-17:00"},
+            {obj: Mos_zoo_Marker, name: "Московский зоопарк", desc: "Московский зоопарк — это один из старейших зоопарков Европы, основанный в 1864 году, который является не только местом отдыха, но и важным научным центром, участвующим в международных программах по сохранению редких видов животных. ", adress: "Большая Грузинская улица, 1с1", time: "09:00-17:00"},
+            {obj: Mos_City_Marker, name: "Московский международный деловой центр Москва-Сити", desc: "Московский международный деловой центр Москва-Сити— это современный международный деловой центр в Москве, представляющий собой комплекс футуристичных небоскребов, где располагаются офисы крупных компаний, апартаменты, рестораны, торговые центры и развлекательные заведения, а также смотровые площадки с панорамными видами на город.", adress: "1-й Красногвардейский проезд, 19", time: "10:00-23:00"},
+            {obj: Eca_home_Marker, name: "Екатерининский дворец", desc: "Екатерининский дворец в Москве — это грандиозный исторический комплекс в стиле русского классицизма, построенный для Екатерины II, который долгое время служил военной академией и теперь передан Музею Тропинина для реставрации и превращения в музей-выставочный центр. На данный момент внутрь попасть нельзя, но можно насладиться внешнем видом дворца во время прогулки по Лефортовскому парку. ", adress: "1-й Краснокурсантский проезд, 3/5", time: "05:00-00:00"},
+            {obj: Lugniki_Marker, name: "Лужники", desc: "Лужники - это крупнейший олимпийский спортивно-развлекательный комплекс в Москве, включающий Большую спортивную арену (БСА) — главный стадион страны вместимостью 81 000 зрителей, который принимал Олимпиаду-80 и финал ЧМ по футболу 2018, а также Малую спортивную арену (МСА) для хоккейных и других мероприятий.", adress: "улица Лужники, 24с1", time: "06:00-23:00"},
+            {obj: Rus_impress_Marker, name: "Музей русского импрессионизма", desc: "Музей русского импрессионизма — это частный музей в Москве, посвященный русскому искусству конца XIX – первой трети XX века, расположенный в футуристическом здании на территории бывшей кондитерской фабрики «Большевик». Он представляет работы знаковых мастеров, таких как Серов, Коровин, Грабарь, а также менее известных художников, и предлагает интерактивные образовательные программы для всех посетителей, включая слабовидящих гостей. ", adress: "Ленинградский проспект, 15с11", time: "11:00-20:00"},
+            {obj: History_goss_Marker, name: "Государственный исторический музей", desc: "Государственный исторический музей - это крупнейший национальный музей России, расположенный на Красной площади в Москве, который хранит и экспонирует бесценные памятники истории и культуры страны, начиная с древнейших времен и до начала XX века, являясь важным культурно-просветительским и научно-исследовательским центром. Его обширная коллекция насчитывает около 5 миллионов экспонатов.", adress: "Красная площадь, 1", time: "10:00-18:00"},
+            {obj: MGY_Marker, name: "Московский государственный университет имени М. В. Ломоносова", desc: "Главное здание МГУ на Воробьевых горах — самая высокая сталинская высотка. Одним из символов столицы по праву считается Главное здание МГУ. Его высота вместе со шпилем составляет 236 метров, что делает здание самой высокой из построенных сталинских высоток. ", adress: "территория Ленинские Горы, 1", time: "00:00-00:00"},
+            {obj: VOrGor_Marker, name: "Парк культуры и отдыха Воробьёвы горы", desc: "Парк «Воробьёвы горы» — это уникальный природный заказник и одна из главных достопримечательностей Москвы, расположенная на высоком правом берегу Москвы-реки, с которой открываются панорамные виды столицы. Это место сочетает в себе дикую природу, где можно гулять по экотропам, встречать животных и растения, а также современную инфраструктуру, включающую канатно-кресельную дорогу, спортивные объекты и зоны для отдыха.", adress: "природный заказник Воробьёвы горы", time: "00:00-00:00"},
+            {obj: Gorpark_Marker, name: "Центральный парк культуры и отдыха им. М. Горького", desc: "Парк Горького (ЦПКиО им. М. Горького) — это крупнейший и один из самых популярных парков Москвы, расположенный на берегу Москвы-реки. Он предлагает зоны для отдыха, спорта, культурные мероприятия, прокат, аттракционы и является популярным местом для прогулок и досуга москвичей и туристов. ", adress: "ул. Крымский Вал, 9, стр. 11", time: "09:00-22:00"},
+            {obj: Patrish_Marker, name: "Патриаршие пруды", desc: "Патриаршие пруды в Москве — это исторический район, парк с прудом, сквер и модное место с ресторанами, а также знаковый литературный топоним благодаря роману М. Булгакова «Мастер и Маргарита», где начинаются мистические события. Это сочетание культурного наследия, природной зоны и центра светской жизни, где можно найти памятник Крылову, гулять по аллеям и посещать стильные заведения.", adress: "Ермолаевский переулок", time: "00:00-00:00"},
+            {obj: Chist_Marker, name: "Чистые пруды", desc: "«Чистые пруды» в Москве — это исторический район, названный в честь одного пруда на Чистопрудном бульваре, который когда-то был «поганым» и очищенный князем Меншиковым. Сегодня это популярная парковая зона с лебедями, место отдыха, а также одноименная станция метро, известная своей атмосферой достопримечательностями. ", adress: "Чистопрудный бульвар", time: "00:00-00:00"},
+            {obj: Red_park_Marker, name: "Парк Красная Пресня", desc: "Парк Красная Пресня — это исторический парк культуры и отдыха в центре Москвы, сочетающий природную красоту старинной усадьбы (XVIII-XIX вв.) с современной инфраструктурой для отдыха, спорта (велосипеды, зимний каток) и культурных мероприятий (фестивали, кино, мастер-классы), с живописными прудами, мостиками и аллеями, являющийся объектом культурного наследия.", adress: "Мантулинская улица, 5", time: "00:00-00:00"},
+            {obj: Apetec_Marker, name: "Аптекарский огород", desc: "Аптекарский огород — это старейший в России ботанический сад, основанный Петром I в 1706 году как сад для выращивания лекарственных трав, который с тех пор превратился в уникальную коллекцию растений, живой музей и культурный центр в центре Москвы. Здесь можно увидеть экзотические растения в оранжереях, лекарственные травы, редкие деревья, а также посетить выставки, концерты и фестивали, наслаждаясь природой в сердце мегаполиса.", adress: "просп. Мира, 26, стр. 1", time: "10:00-20:00"},
+            // {obj: , name: "", desc: "", adress: "", time: ""},
+        ];
+
+        
+        objects.forEach(function(item) {
+            item.obj.on('click', function(e) {
+                document.getElementById('selected-title').textContent = item.name;
+                // document.getElementById('info-type').textContent = item.type;
+                document.getElementById('info-desc').textContent = item.desc;
+                // document.getElementById('info-dist').textContent = '-';
+                // document.getElementById('info-coords').textContent = e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6);
+                document.getElementById('info-adress').textContent = item.adress;
+                document.getElementById('info-time').textContent = item.time;
+                
+                document.getElementById('selected-info').classList.add('active');
+                
+                // Прокрутка к информации
+                document.getElementById('selected-info').scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            });
+        });
+        // зум при клике на объекты
+        objects.forEach(function(item) {
+            item.obj.on('click', function(e) {
+                // Приближаем карту к объекту
+                map.flyTo(e.latlng, 18, {
+                    duration: 1.6, // длительность анимации в секундах
+                    easeLinearity: 0.25
+                });
+            });
+        });
+        // Инициализация карты
+        map.whenReady(function() {
+        });
+    </script>
+</body>
+</html>
